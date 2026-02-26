@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Recognition System</title>
+  <style>
+    /* --- Base Styles --- */
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100%;
+      height: 100%;
+    }
+    html { height: 100%; }
+    * { box-sizing: border-box; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .header { text-align: center; color: white; margin-bottom: 2rem; }
+    .header h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; font-weight: 700; }
+    .header p { font-size: 1.1rem; opacity: 0.9; margin: 0; }
+
+    .main-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    .card h2 { margin: 0 0 1rem 0; font-size: 1.25rem; color: #1a202c; }
+
+    .upload-zone {
+      border: 3px dashed #cbd5e0; border-radius: 8px;
+      padding: 2rem; text-align: center; cursor: pointer;
+      transition: all 0.3s; background: #f7fafc;
+    }
+    .upload-zone:hover { border-color: #667eea; background: #edf2f7; }
+    .upload-zone.dragover { border-color: #667eea; background: #e6f2ff; }
+    .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .upload-zone p { margin: 0.5rem 0; color: #4a5568; }
+
+    .btn {
+      background: #667eea; color: white; border: none;
+      padding: 0.75rem 1.5rem; border-radius: 6px;
+      font-size: 1rem; cursor: pointer; transition: all 0.3s;
+      font-weight: 600;
+    }
+    .btn:hover { background: #5a67d8; transform: translateY(-1px); }
+    .btn:disabled { background: #cbd5e0; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: #48bb78; }
+    .btn-secondary:hover { background: #38a169; }
+    .btn-danger { background: #f56565; }
+    .btn-danger:hover { background: #e53e3e; }
+    .btn-small { padding: 0.4rem 0.8rem; font-size: 0.875rem; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem; border-radius: 8px; text-align: center; }
+    .stat-value { font-size: 2rem; font-weight: 700; margin: 0; }
+    .stat-label { font-size: 0.875rem; opacity: 0.9; margin: 0.25rem 0 0 0; }
+
+    .document-list { max-height: 600px; overflow-y: auto; }
+    .document-item { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; transition: all 0.3s; }
+    .document-item:hover { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+
+    .document-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem; }
+    .document-title { font-weight: 600; color: #1a202c; margin: 0 0 0.25rem 0; }
+    .document-type { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+
+    .type-invoice { background: #fef5e7; color: #f39c12; }
+    .type-contract { background: #e8f5e9; color: #27ae60; }
+    .type-identity { background: #e3f2fd; color: #2196f3; }
+    .type-receipt { background: #fce4ec; color: #e91e63; }
+    .type-letter { background: #f3e5f5; color: #9c27b0; }
+    .type-form { background: #fff3e0; color: #ff9800; }
+
+    .document-meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.875rem; color: #4a5568; margin-bottom: 0.75rem; }
+    .meta-item { display: flex; align-items: center; gap: 0.5rem; }
+
+    .confidence-bar { background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 0.25rem; }
+    .confidence-fill { height: 100%; transition: width 0.3s; background: #48bb78; }
+
+    .document-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .status-badge { padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+    .status-processing { background: #bee3f8; color: #2c5282; }
+    .status-completed { background: #c6f6d5; color: #22543d; }
+    .status-review { background: #fed7d7; color: #742a2a; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 12px; padding: 2rem; max-width: 800px; width: 90%; max-height: 90%; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .modal-header h2 { margin: 0; color: #1a202c; }
+    .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #718096; padding: 0; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; }
+    .close-btn:hover { color: #1a202c; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #2d3748; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 1rem; font-family: inherit; }
+    .form-group textarea { min-height: 100px; resize: vertical; }
+
+    .processing-indicator { display: none; text-align: center; padding: 1rem; background: #edf2f7; border-radius: 8px; margin-top: 1rem; }
+    .processing-indicator.active { display: block; }
+    .spinner { border: 3px solid #e2e8f0; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .toast { position: fixed; bottom: 2rem; right: 2rem; background: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); display: none; z-index: 2000; max-width: 400px; }
+    .toast.active { display: block; animation: slideIn 0.3s ease; }
+    @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast.success { border-left: 4px solid #48bb78; }
+    .toast.error { border-left: 4px solid #f56565; }
+
+    .empty-state { text-align: center; padding: 3rem 1rem; color: #718096; }
+    .empty-state-icon { font-size: 4rem; margin-bottom: 1rem; }
+
+    .filters { margin-top: 1rem; display: grid; gap: 0.5rem; }
+    .filters .row { display:flex; gap: 0.5rem; align-items:center; }
+    .filters .row input[type="date"], .filters .row select { flex:1; }
+    .filter-actions { display:flex; gap:0.5rem; margin-top:0.5rem; }
+
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .document-meta { grid-template-columns: 1fr; }
+      .header h1 { font-size: 1.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 id="system-title">Document Recognition System</h1>
+      <p id="welcome-message">Upload documents for automatic processing and intelligent recognition</p>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card"><p class="stat-value" id="total-docs">0</p><p class="stat-label">Total Documents</p></div>
+      <div class="stat-card"><p class="stat-value" id="processed-docs">0</p><p class="stat-label">Processed</p></div>
+      <div class="stat-card"><p class="stat-value" id="pending-review">0</p><p class="stat-label">Pending Review</p></div>
+      <div class="stat-card"><p class="stat-value" id="reviewed-docs">0</p><p class="stat-label">Reviewed</p></div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <h2>📤 Document Ingestion</h2>
+        <div class="upload-zone" id="upload-zone">
+          <div class="upload-icon">📄</div>
+          <p><strong id="upload-button-text">Click to upload or drag &amp; drop</strong></p>
+          <p>Supports: PDF, Images, Scanned Documents</p>
+          <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp" multiple style="display: none;">
+        </div>
+
+        <div class="processing-indicator" id="processing-indicator">
+          <div class="spinner"></div>
+          <p><strong>Processing document...</strong></p>
+          <p style="font-size: 0.875rem; color: #718096;">Running OCR, classification &amp; extraction</p>
+        </div>
+
+        <div class="filters" id="filters">
+          <div class="row"><label style="min-width:70px;">From</label><input type="date" id="filter-start" /></div>
+          <div class="row"><label style="min-width:70px;">To</label><input type="date" id="filter-end" /></div>
+          <div class="row"><label style="min-width:70px;">Type</label><select id="filter-type"><option value="All">All</option></select></div>
+          <div class="row"><label style="min-width:70px;">Department</label><select id="filter-dept"><option value="All">All</option></select></div>
+          <div class="filter-actions">
+            <button id="apply-filters" class="btn btn-small">Apply Filters</button>
+            <button id="clear-filters" class="btn btn-small" style="background:#e2e8f0;color:#1a202c;">Clear Filters</button>
+            <button id="delete-all" class="btn btn-danger btn-small" style="margin-left:auto;">Delete All Documents</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Document Queue</h2>
+        <div class="document-list" id="document-list">
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p><strong>No documents yet</strong></p>
+            <p style="font-size: 0.875rem;">Upload a document to get started</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="review-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📝 Manual Verification</h2>
+        <button class="close-btn" id="close-modal">×</button>
+      </div>
+      <form id="review-form">
+        <div class="form-group"><label for="edit-filename">Filename</label><input type="text" id="edit-filename" required></div>
+        <div class="form-group"><label for="edit-type">Document Type</label>
+          <select id="edit-type" required>
+            <option value="Invoice">📄 Invoice</option>
+            <option value="Contract">📋 Contract</option>
+            <option value="Identity Document">🪪 Identity Document</option>
+            <option value="Receipt">🧾 Receipt</option>
+            <option value="Letter">✉️ Letter</option>
+            <option value="Official Form">📝 Official Form</option>
+          </select>
+        </div>
+        <div class="form-group"><label for="edit-department">Assign Department</label>
+          <select id="edit-department" required>
+            <option value="HR">Human Resources</option>
+            <option value="Finance">Finance &amp; Accounting</option>
+            <option value="Legal">Legal</option>
+            <option value="Customer Support">Customer Support</option>
+            <option value="Operations">Operations</option>
+            <option value="Archives">Archives</option>
+          </select>
+        </div>
+        <div class="form-group"><label for="edit-text">Extracted Text</label><textarea id="edit-text" rows="6"></textarea></div>
+        <div class="form-group"><label for="edit-metadata">Metadata (JSON format)</label><textarea id="edit-metadata" rows="4"></textarea></div>
+        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-secondary" style="flex: 1;">✓ Approve & Save</button>
+          <button type="button" class="btn btn-danger" id="reject-btn" style="flex: 1;">✗ Reject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><p id="toast-message" style="margin:0;"></p></div>
+
+<script>
+let documents = [];
+const API_BASE = "http://localhost:5000/api/documents";
+let currentEditingDoc = null;
+
+const documentTypes = ['Invoice','Contract','Identity Document','Receipt','Letter','Official Form'];
+const departments = ['HR','Finance','Legal','Customer Support','Operations','Archives'];
+
+// ---------------- TOAST ----------------
+function showToast(message, type='success') {
+  const toast = document.getElementById('toast');
+  const toastMessage = document.getElementById('toast-message');
+  toastMessage.textContent = message;
+  toast.className = `toast ${type} active`;
+  setTimeout(() => toast.className = 'toast', 3000);
+}
+
+// ---------------- FETCH ----------------
+async function fetchDocuments() {
+  const res = await fetch(API_BASE);
+  documents = await res.json();
+  renderDocuments();
+}
+
+// ---------------- RENDER ----------------
+function renderDocuments() {
+  const list = document.getElementById('document-list');
+
+  if (!documents.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">📭</div>
+      <p><strong>No documents yet</strong></p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = documents.map(doc => {
+    const typeClass = (doc.document_type || '').toLowerCase().replace(/\s+/g,'-');
+    const statusClass = (doc.status || '').toLowerCase();
+
+    return `
+    <div class="document-item">
+      <div class="document-header">
+        <div>
+          <h3 class="document-title">${doc.filename}</h3>
+          <span class="document-type type-${typeClass}">
+            ${doc.document_type}
+          </span>
+        </div>
+        <span class="status-badge status-${statusClass}">
+          ${doc.status}
+        </span>
+      </div>
+
+      <div class="document-meta">
+        <div>📅 ${new Date(doc.upload_date).toLocaleDateString()}</div>
+        <div>🏢 ${doc.assigned_department}</div>
+        <div>📁 <a href="http://localhost:5000/uploads/${doc.filename}" target="_blank">View</a></div>
+      </div>
+
+      ${doc.summary ? `<p style="margin-top:10px;"><strong>AI Summary:</strong><br>${doc.summary}</p>` : ''}
+
+      <div class="document-actions">
+        <button class="btn btn-secondary btn-small" onclick="reprocessAI('${doc._id}')">
+          🔄 Reprocess AI
+        </button>
+        <button class="btn btn-danger btn-small" onclick="deleteDoc('${doc._id}')">
+          🗑 Delete
+        </button>
+      </div>
+    </div>
+    `;
+  }).join('');
+}
+
+// ---------------- UPLOAD ----------------
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const indicator = document.getElementById('processing-indicator');
+
+uploadZone.onclick = () => fileInput.click();
+
+fileInput.onchange = () => handleFiles(fileInput.files);
+
+async function handleFiles(files) {
+  if (!files.length) return;
+
+  indicator.classList.add('active');
+
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('content', ''); // OCR can be added later
+
+    await fetch(API_BASE, {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  indicator.classList.remove('active');
+  showToast("Uploaded successfully. AI processing in background...");
+  fetchDocuments();
+
+  // small delay to allow async AI update
+  setTimeout(fetchDocuments, 3000);
+}
+
+// ---------------- DELETE ----------------
+async function deleteDoc(id) {
+  if (!confirm("Delete this document?")) return;
+  await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+  showToast("Deleted successfully");
+  fetchDocuments();
+}
+
+// ---------------- REPROCESS ----------------
+async function reprocessAI(id) {
+  await fetch(`${API_BASE}/${id}/process-ai`, { method: 'POST' });
+  showToast("AI Reprocessed");
+  fetchDocuments();
+}
+
+// ---------------- INIT ----------------
+fetchDocuments();
+</script>
+</body>
+</html>
